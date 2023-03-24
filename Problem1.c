@@ -60,6 +60,85 @@ double findAvg(int arr[], int size) {
     return avg;
 }
 
+// structure that holds average and maximum, returned in the dfs
+struct info {
+    double average;
+    int maximum;
+};
+
+// dfs method, keeps spawning children if PN not reached or array cannot be split anymore
+struct info dfs(int PN, int L, int *randNumbers) {
+    double average;
+    int maximum;
+    struct info ret = { 0.0, 0 };
+    int fd[2][2];
+
+    pipe(fd[0]);
+    pipe(fd[1]);
+
+    pid_t pid = fork();
+   
+    if (pid == 0) {
+        printf("Hi I'm process %d with return arg %d and my parent is %d.\n", getpid(), PN, getppid());
+        close(fd[0][1]);
+        close(fd[1][0]);
+        int arrRightSize = L - L/2;
+        int *arrRight = (int *)malloc(sizeof(int) * arrRightSize);
+        read(fd[0][0], arrRight, sizeof(int) * arrRightSize);
+        if (PN > 2 && arrRightSize > 2) {
+            dfs(PN - 1, arrRightSize, &arrRight[0]);
+        }
+        ret.average = findAvg(arrRight, arrRightSize);
+        ret.maximum = findMax(arrRight, arrRightSize);
+        
+        write(fd[1][1], &ret.average, sizeof(double));
+        write(fd[1][1], &ret.maximum, sizeof(int));
+        
+        // printf("arrRight: ");
+        // for (int i = 0; i < arrRightSize; i++) {
+        //     printf("%d ", arrRight[i]);
+        // }
+        // printf("\n");
+
+        free(arrRight);
+
+        exit(0);
+
+    }
+    else {
+        close(fd[0][0]);
+        close(fd[1][1]);
+        int *arrRight = right(randNumbers, L);
+        write(fd[0][1], arrRight, sizeof(int) * (L - L/2));
+        
+        wait(NULL);
+
+        double childAverage;
+        int childMax;
+        read(fd[1][0], &childAverage, sizeof(double));
+        read(fd[1][0], &childMax, sizeof(int));
+       
+        int *arrLeft = left(randNumbers, L);
+        double parentAverage = findAvg(arrLeft, L/2);
+        int parentMax = findMax(arrLeft, L/2);
+
+        ret.average = (parentAverage * (L/2) + childAverage * (L - L/2))/L;
+        ret.maximum = max(parentMax, childMax);
+
+        // printf("arrLeft: ");
+        // for (int i = 0; i < L/2; i++) {
+        //     printf("%d ", arrLeft[i]);
+        // }
+        // printf("\n");
+        
+        free(arrLeft);
+        free(arrRight);
+
+    }
+    return ret;
+}
+
+
 int main() {
 
 	FILE *fp; 
@@ -84,7 +163,7 @@ int main() {
 
     srand(time(NULL));
 
-    int randNumbers[L];
+    int *randNumbers = malloc(L * sizeof(int));
 
 	//generate initial random number array
 	for (int i = 0; i < L; i++) {
@@ -105,81 +184,14 @@ int main() {
         fprintf(fp, "%d\n", randNumbers[i]); 
     }
 
-    fprintf(fp, "%s %lu\n", "Length of array is: ", sizeof(randNumbers)/sizeof(randNumbers[0])); 
+    fprintf(fp, "%s %d\n", "Length of array is: ", L); 
 
     fclose(fp);
 
-    
-    double average;
-    int maximum;
-    int fd[2][2];
-
-    pipe(fd[0]);
-    pipe(fd[1]);
-
-    pid_t pid = fork();
-   
-    if (pid == 0) {
-        close(fd[0][1]);
-        close(fd[1][0]);
-        int *arrRight = (int *)malloc(sizeof(int) * (L - L/2));
-        read(fd[0][0], arrRight, sizeof(int) * (L - L/2)); 
-        average = findAvg(arrRight, L - L/2);
-        maximum = findMax(arrRight, L - L/2);
-        
-        write(fd[1][1], &average, sizeof(double));
-        write(fd[1][1], &maximum, sizeof(int));
-        
-        printf("arrRight: ");
-        for (int i = 0; i < L - L/2; i++) {
-            printf("%d ", arrRight[i]);
-        }
-        printf("\n");
-
-        // printf("%s %f\n", "Child average is: ", average); 
-        // printf("%s %d\n", "Child maximum is: ", maximum); 
-
-        free(arrRight);
-
-        exit(0);
-
-    }
-    else {
-        close(fd[0][0]);
-        close(fd[1][1]);
-        int *arrRight = right(randNumbers, L);
-        write(fd[0][1], arrRight, sizeof(int) * (L - L/2));
-        
-        wait(NULL);
-
-        double childAverage;
-        int childMax;
-        read(fd[1][0], &childAverage, sizeof(double));
-        read(fd[1][0], &childMax, sizeof(int));
-       
-        int *arrLeft = left(randNumbers, L);
-        double parentAverage = findAvg(arrLeft, L/2);
-        int parentMax = findMax(arrLeft, L/2);
-
-        average = (parentAverage * (L/2) + childAverage * (L - L/2))/L;
-        maximum = max(parentMax, childMax);
-
-        printf("arrLeft: ");
-        for (int i = 0; i < L/2; i++) {
-            printf("%d ", arrLeft[i]);
-        }
-        printf("\n");
-        
-        // printf("%s %f\n", "Parent average is: ", parentAverage); 
-        // printf("%s %d\n", "Parent maximum is: ", parentMax); 
-        
-        free(arrLeft);
-        free(arrRight);
-
-    }
-    
-    printf("%s %f\n", "Average is: ", average); 
-    printf("%s %d\n", "Maximum is: ", maximum); 
+    struct info data = dfs(PN, L, randNumbers);
+    free(randNumbers);
+    printf("%s %f\n", "Average is: ", data.average); 
+    printf("%s %d\n", "Maximum is: ", data.maximum); 
 
 	return 0;
 }
