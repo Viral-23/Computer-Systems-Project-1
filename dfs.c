@@ -68,6 +68,10 @@ int findKeys(int arr[], int size, int keysFound, int shift) {
                 keysFound+=1;
 				printf("Hi I'm process %d and I found the hidden key %d in position A[%d] \n", getpid(), keysFound, i + shift);
         		}
+
+                if (keysFound == H) {
+                    break;
+                }
 		}
     printf("\n");
     return keysFound;
@@ -161,20 +165,20 @@ struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
         }
         printf("\n");
 
+        if (PN > 2 && arrRightSize > 1) {
+            ret = dfs(PN - 1, arrRightSize, &arrRight[0], ret, shift + arrLeftSize);
+        }
+
         if (PN == 2) {
             ret.average = findAvg(arrRight, arrRightSize);
             ret.maximum = findMax(arrRight, arrRightSize);
             ret.keysFound = findKeys(arrRight, arrRightSize, ret.keysFound, shift + arrLeftSize);
         }
         
-        if (PN > 2 && arrRightSize > 1) {
-            ret = dfs(PN - 1, arrRightSize, &arrRight[0], ret, shift + arrLeftSize);
-        }
-    
         
-        write(fd[1][1], &average, sizeof(double));
-        write(fd[1][1], &maximum, sizeof(int));
-        write(fd[1][1], &keysFound, sizeof(int));
+        write(fd[1][1], &ret.average, sizeof(double));
+        write(fd[1][1], &ret.maximum, sizeof(int));
+        write(fd[1][1], &ret.keysFound, sizeof(int));
 
 
 
