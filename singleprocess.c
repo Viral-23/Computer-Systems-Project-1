@@ -33,6 +33,9 @@ int findKeys(int arr[], int size, int keysFound) {
 	//print the location of keys and return the number of keys found
 		for (int i = 0; i < size; i++)
 		{
+			    if (keysFound == H) {
+                    break;
+                }
 		        if (arr[i] == -1 && keysFound < H) {
                 keysFound+=1;
 				printf("Hi I'm process %d and I found the hidden key %d in position A[%d] \n", getpid(), keysFound, i);

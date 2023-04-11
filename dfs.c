@@ -64,14 +64,14 @@ int findKeys(int arr[], int size, int keysFound, int shift) {
 	//print the location of keys and return the number of keys found
 		for (int i = 0; i < size; i++)
 		{
+                if (keysFound == H) {
+                    break;
+                }
+
 		        if (arr[i] == -1 && keysFound < H) {
                 keysFound+=1;
 				printf("Hi I'm process %d and I found the hidden key %d in position A[%d] \n", getpid(), keysFound, i + shift);
         		}
-
-                if (keysFound == H) {
-                    break;
-                }
 		}
     printf("\n");
     return keysFound;
@@ -140,9 +140,7 @@ struct info {
 struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
     int prevShift = shift;
     int firstPN = PN;
-    double average = ret.average;
-    int maximum = ret.maximum;
-    int keysFound = ret.keysFound;
+
     int fd[2][2];
 
     pipe(fd[0]);
@@ -180,12 +178,9 @@ struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
         write(fd[1][1], &ret.maximum, sizeof(int));
         write(fd[1][1], &ret.keysFound, sizeof(int));
 
-
-
         free(arrRight);
 
         exit(0);
-
     }
     else {
         close(fd[0][0]);
