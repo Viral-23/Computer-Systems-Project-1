@@ -3,6 +3,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <string.h>
 
 int L;
 int H;
@@ -12,6 +13,28 @@ struct ArrayInfo {
     int* arr;
     int size;
 };
+
+// structure that holds average and maximum, returned in the dfs
+struct info {
+    double average;
+    int maximum;
+    int keysFound;
+    char *keyFoundMessage;
+};
+
+char *string_append(char *s1, char *s2) {
+    int s1_length = strlen(s1);
+    int s2_length = strlen(s2);
+    int size = s1_length + s2_length + 1;
+    char *s = calloc(size, sizeof(char));
+
+    strcpy(s, s1);
+    strcat(s, s2);
+    
+    // printf("%s", s);
+
+    return s;
+}
 
 struct ArrayInfo split_array(int *arr, int size, int parts, int section) {
     int start = section * size / parts;
@@ -62,22 +85,28 @@ double findAvg(int arr[], int size) {
     return avg;
 }
 
-int findKeys(int arr[], int size, int keysFound, int shift) {
-	//print the location of keys and return the number of keys found
-		for (int i = 0; i < size; i++)
-		{
-		        if (arr[i] == -1 && keysFound < H) {
-                keysFound+=1;
-				printf("Hi I'm process %d and I found the hidden key %d in position A[%d] \n", getpid(), keysFound, i + shift);
-        		}
-
-                if (keysFound == H) {
-                    break;
-                }
-		}
-    printf("\n");
-    return keysFound;
+char *findKeys(int arr[], int size, int keysFound, int shift) {
+    //print the location of keys and return the number of keys found
+    char *keyFoundMessage = malloc(sizeof(char) * 1024);
+    *keyFoundMessage = '\0';
+  
+    for (int i = 0; i < size; i++) {
+        if (keysFound == H) {
+            break;
+        }
+        if (arr[i] == -1 && keysFound < H) {
+            keysFound += 1;
+            char *message = malloc(sizeof(char) * 1024);
+            *message = '\0';  
+            sprintf(message, "Hi I'm process %d and I found the hidden key in position A[%d]\n", getpid(), i + shift);
+            keyFoundMessage = string_append(keyFoundMessage, message);
+            free(message);
+        }
+    }
+    // printf("%s", keyFoundMessage);
+    return keyFoundMessage;
 }
+
 
 int randomNumber(int min, int max) 
 {
@@ -131,14 +160,6 @@ int fileGenerator()
 return 0;
 }
 
-// structure that holds average and maximum, returned in the dfs
-struct info {
-    double average;
-    int maximum;
-    int keysFound;
-};
-
-
 struct info bfs(int PN, int sizeOfChildren, int timesCalled, int L, int *randNumbers, struct info ret, int shift) {
     
     pid_t pid[sizeOfChildren];
@@ -166,11 +187,11 @@ struct info bfs(int PN, int sizeOfChildren, int timesCalled, int L, int *randNum
             int shiftArr[sizeOfChildren];
             read(fdptoc[i][0], &shiftArr, sizeof(int) * sizeOfChildren);
 
-            printf("pid: %d arr: \n", getpid());
-            for (int i = 0; i < part.size; i++) {
-                printf("value: %d index: %d\n", part.arr[i] , i);
-            }
-            printf("\n");
+            // printf("pid: %d arr: \n", getpid());
+            // for (int i = 0; i < part.size; i++) {
+            //     printf("value: %d index: %d\n", part.arr[i] , i);
+            // }
+            // printf("\n");
 
             int futureProcesses = 0;
             for (int i = 0; i <= timesCalled + 1; i++) {
@@ -187,12 +208,15 @@ struct info bfs(int PN, int sizeOfChildren, int timesCalled, int L, int *randNum
             else {
                 ret.average = findAvg(part.arr, part.size);
                 ret.maximum = findMax(part.arr, part.size);
-                ret.keysFound = findKeys(part.arr, part.size, ret.keysFound, shift);
+                ret.keyFoundMessage = string_append(ret.keyFoundMessage, findKeys(part.arr, part.size, ret.keysFound, shift));
+                // printf("%s", ret.keyFoundMessage);
             }
 
             write(fdctop[i][1], &ret.average, sizeof(double));
             write(fdctop[i][1], &ret.maximum, sizeof(int));
-            write(fdctop[i][1], &ret.keysFound, sizeof(int));
+            int size = sizeof(char) * strlen(ret.keyFoundMessage);
+            write(fdctop[i][1], &size, sizeof(int));
+            write(fdctop[i][1], ret.keyFoundMessage, size);
             
             free(part.arr);
 
@@ -221,16 +245,27 @@ struct info bfs(int PN, int sizeOfChildren, int timesCalled, int L, int *randNum
     
     double temp = 0;
     int temp2 = 0;
-    int temp3 = 0;
+    int size = 0;
 
     for (int i = 0; i < sizeOfChildren; i++) {
         read(fdctop[i][0], &temp, sizeof(double));
         ret.average += (temp * partitions[i].size);
         read(fdctop[i][0], &temp2, sizeof(int));
         ret.maximum = max2(ret.maximum, temp2);
-        read(fdctop[i][0], &temp3, sizeof(int));
-        ret.keysFound += temp3;
+        
+        read(fdctop[i][0], &size, sizeof(int));
+        char *buf = malloc(size + 1);
+        read(fdctop[i][0], buf, size);
+        buf[size] = '\0';
 
+        
+        // printf("%s", buf);
+
+        ret.keyFoundMessage = string_append(ret.keyFoundMessage, buf);
+        
+        // printf("%s", ret.keyFoundMessage);
+
+        free(buf);
         free(partitions[i].arr);
     }
 
@@ -276,17 +311,33 @@ int main( int argc, char *argv[] )  {
 	
 	fclose(fp);
 
-	struct info data = {0.0 , 0 , 0};
-    // data = dfs(PN, L, randNumbers, data, 0);
+    struct info data = {0.0 , 0 , 0, NULL};
+    data.keyFoundMessage = malloc(sizeof(char));
+    *data.keyFoundMessage = '\0';
     int sizeOfChildren = 4;
     data = bfs(PN, sizeOfChildren, 1, L, randNumbers, data, 0);
-
 	fp = fopen("results.txt", "w");
 	fprintf(fp, "%s %f\n", "Average is: ", data.average);
 	fprintf(fp, "%s %d\n", "Maximum is: ", data.maximum);
-    fprintf(fp, "%s %d\n", "Keys found is: ", data.keysFound);
+    fprintf(fp, "%s %d\n", "Keys found is: ", H);
+
+    int max_lines = H;
+    int lines_printed = 0;
+
+    char *ptr = data.keyFoundMessage;
+    while (*ptr && lines_printed < max_lines) {
+    if (*ptr == '\n') {
+        lines_printed++;
+    }
+    fputc(*ptr, fp);
+    ptr++;
+}
+
+    // fprintf(fp, "%s", data.keyFoundMessage);
+
 
 	fclose(fp);  
 
+    free(data.keyFoundMessage);
 	return 0;
 }
