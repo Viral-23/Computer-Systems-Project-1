@@ -271,7 +271,7 @@ struct info bfs(int PN, int sizeOfChildren, int timesCalled, int L, int *randNum
 
     ret.average /= L;
 
-    printf("Hi i am the parent with pid %d\n", getpid());
+    // printf("Hi i am the parent with pid %d\n", getpid());
     
     
     return ret;
