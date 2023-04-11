@@ -60,22 +60,23 @@ double findAvg(int arr[], int size) {
     return avg;
 }
 
-int findKeys(int arr[], int size, int keysFound, int shift) {
-	//print the location of keys and return the number of keys found
-		for (int i = 0; i < size; i++)
-		{
-                if (keysFound == H) {
-                    break;
-                }
+int findKeys(int arr[], int size, int keysFound, int shift, FILE *fp) {
+    //print the location of keys and return the number of keys found
+    for (int i = 0; i < size; i++) {
+        if (keysFound == H) {
+            break;
+        }
 
-		        if (arr[i] == -1 && keysFound < H) {
-                keysFound+=1;
-				printf("Hi I'm process %d and I found the hidden key %d in position A[%d] \n", getpid(), keysFound, i + shift);
-        		}
-		}
-    printf("\n");
+        if (arr[i] == -1 && keysFound < H) {
+            keysFound += 1;
+            fprintf(fp, "Hi I'm process %d and I found the hidden key %d in position A[%d] \n", getpid(), keysFound, i + shift);
+        }
+    }
+    fprintf(fp, "\n");
+
     return keysFound;
 }
+
 
 int randomNumber(int min, int max) 
 {
@@ -137,7 +138,7 @@ struct info {
 };
 
 // dfs method, keeps spawning children if PN not reached or array cannot be split anymore
-struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
+struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift, FILE *fp) {
     int prevShift = shift;
     int firstPN = PN;
 
@@ -149,7 +150,7 @@ struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
     pid_t pid = fork();
    
     if (pid == 0) {
-        printf("Hi I'm process %d with return arg %d and my parent is %d.\n", getpid(), PN, getppid());
+        fprintf(fp, "Hi I'm process %d with return arg %d and my parent is %d.\n", getpid(), PN, getppid());
         close(fd[0][1]);
         close(fd[1][0]);
         int arrLeftSize = L/2;
@@ -157,20 +158,20 @@ struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
         int *arrRight = (int *)malloc(sizeof(int) * arrRightSize);
         read(fd[0][0], arrRight, sizeof(int) * arrRightSize);
 
-        printf("pid: %d arrRight: \n", getpid());
-        for (int i = 0; i < arrRightSize; i++) {
-            printf("value: %d index: %d\n", arrRight[i] , i);
-        }
-        printf("\n");
+        // printf("pid: %d arrRight: \n", getpid());
+        // for (int i = 0; i < arrRightSize; i++) {
+        //     printf("value: %d index: %d\n", arrRight[i] , i);
+        // }
+        // printf("\n");
 
         if (PN > 2 && arrRightSize > 1) {
-            ret = dfs(PN - 1, arrRightSize, &arrRight[0], ret, shift + arrLeftSize);
+            ret = dfs(PN - 1, arrRightSize, &arrRight[0], ret, shift + arrLeftSize, fp);
         }
 
         if (PN == 2) {
             ret.average = findAvg(arrRight, arrRightSize);
             ret.maximum = findMax(arrRight, arrRightSize);
-            ret.keysFound = findKeys(arrRight, arrRightSize, ret.keysFound, shift + arrLeftSize);
+            ret.keysFound = findKeys(arrRight, arrRightSize, ret.keysFound, shift + arrLeftSize, fp);
         }
         
         
@@ -199,11 +200,11 @@ struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
 
         int *arrLeft = left(randNumbers, L);
 
-        printf("pid: %d arrLeft: \n", getpid());
-        for (int i = 0; i < L/2; i++) {
-            printf("value: %d index: %d\n", arrLeft[i] , i);
-        }
-        printf("\n");
+        // printf("pid: %d arrLeft: \n", getpid());
+        // for (int i = 0; i < L/2; i++) {
+        //     printf("value: %d index: %d\n", arrLeft[i] , i);
+        // }
+        // printf("\n");
 
         double parentAverage = findAvg(arrLeft, L/2);
         int parentMax = findMax(arrLeft, L/2);
@@ -211,7 +212,7 @@ struct info dfs(int PN, int L, int *randNumbers, struct info ret, int shift) {
         // if (PN = firstPN)
         //     parentKeysFound = findKeys(arrLeft, L/2, childKeysFound, 0);
         // else
-        parentKeysFound = findKeys(arrLeft, L/2, childKeysFound, prevShift);
+        parentKeysFound = findKeys(arrLeft, L/2, childKeysFound, prevShift, fp);
 
         ret.average = (parentAverage * (L/2) + childAverage * (L - L/2))/L;
         ret.maximum = max2(parentMax, childMax);
@@ -256,16 +257,17 @@ int main( int argc, char *argv[] )  {
 	}	
 	
 	fclose(fp);
-
+	
+    fp = fopen("results.txt", "w");
 	struct info data = {0.0 , 0 , 0};
-    data = dfs(PN, L, randNumbers, data, 0);
+    data = dfs(PN, L, randNumbers, data, 0, fp);
 
-	fp = fopen("results.txt", "w");
-	fprintf(fp, "%s %f\n", "Average is: ", data.average);
-	fprintf(fp, "%s %d\n", "Maximum is: ", data.maximum);
-    fprintf(fp, "%s %d\n", "Keys found is: ", data.keysFound);
+    fprintf(fp, "Average is: %f\n", data.average);
+    fprintf(fp, "Maximum is: %d\n", data.maximum);
+    fprintf(fp, "Keys found is: %d\n", data.keysFound);
+    
+    fclose(fp);
 
-	fclose(fp);  
 
 	return 0;
 }
